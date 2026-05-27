@@ -285,7 +285,7 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {!checkingProviders && (
                 <div
                   className="flex items-center gap-1.5 text-sm text-muted-foreground"
@@ -317,7 +317,7 @@ export default function Home() {
                 onClick={startNew}
               >
                 <Plus className="w-4 h-4" />
-                New
+                <span className="hidden sm:inline">New</span>
               </Button>
               <ThemeToggle />
             </div>
@@ -427,7 +427,7 @@ export default function Home() {
             <ScrollArea className="flex-1">
               <div className="p-4 sm:p-6">
                 {/* WORKSPACE — side by side on desktop */}
-                <div className="w-full flex flex-col justify-between md:flex-row gap-6 overflow-hidden">
+                <div className="w-full flex flex-col justify-between md:flex-row gap-6">
                   {/* LEFT — Prompt */}
                   <div className="flex-1 shrink-0 space-y-4">
                     <div className="space-y-1">
@@ -576,17 +576,17 @@ export default function Home() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                   onClick={exportReact}
-                                  className="text-base gap-2"
+                                  className="text-base gap-2 cursor-pointer"
                                 >
                                   <FileCode2 className="w-4 h-4" />
-                                  Export as .tsx
+                                  .tsx
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={exportHtml}
-                                  className="text-base gap-2"
+                                  className="text-base gap-2 cursor-pointer"
                                 >
                                   <FileType2 className="w-4 h-4" />
-                                  Export as .html
+                                  .html
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -599,7 +599,7 @@ export default function Home() {
                             if (loading && v === "preview") return;
                             setActiveTab(v as "preview" | "code");
                           }}
-                          className="w-full md:w-[800px]"
+                          className="w-full md:w-200"
                         >
                           <TabsList className="grid w-full grid-cols-2 bg-muted/50 !h-full">
                             <TabsTrigger
@@ -635,7 +635,10 @@ export default function Home() {
                                   />
                                 </div>
                               ) : (
-                                <PreviewFrame code={result.code} />
+                                <PreviewFrame
+                                  code={result.code}
+                                  onRetry={() => generate(result.format)}
+                                />
                               )}
                             </Card>
                             <p className="text-sm text-muted-foreground mt-3 text-center">
@@ -663,15 +666,13 @@ export default function Home() {
                                   style={vscDarkPlus}
                                   wrapLines={true}
                                   wrapLongLines={true}
+                                  className="syntax-highlighter"
                                   customStyle={{
                                     margin: 0,
                                     borderRadius: 0,
                                     fontSize: "14px",
                                     lineHeight: "1.6",
                                     background: "#1e1e1e",
-                                    maxWidth: "800px",
-                                    maxHeight: "500px",
-                                    overflow: "auto",
                                   }}
                                   showLineNumbers
                                   lineNumberStyle={{

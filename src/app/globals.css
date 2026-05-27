@@ -132,3 +132,14 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
 }
+
+@media (min-width: 768px) {
+  .syntax-highlighter {
+    max-width: 800px;
+    max-height: 500px;
+    overflow: auto;
+  }
+}
+.syntax-highlighter {
+width: calc(100vw - 32px) !important;
+}

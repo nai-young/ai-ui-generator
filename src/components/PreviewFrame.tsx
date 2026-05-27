@@ -60,10 +60,23 @@ ${JSON.stringify(cleanedCode)}
   function showError(msg) {
     var root = document.getElementById("root");
     root.innerHTML =
-      '<div style="color:#dc2626;padding:16px;font-family:monospace;font-size:13px;white-space:pre-wrap;">' +
-      '<strong>Preview Error</strong><br><br>' +
+      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:280px;padding:24px;text-align:center;font-family:ui-sans-serif,system-ui,sans-serif;">' +
+      '<div style="color:#dc2626;font-size:14px;font-weight:600;margin-bottom:12px;">Preview could not render</div>' +
+      '<div style="color:#78716c;font-size:13px;line-height:1.5;max-width:360px;margin-bottom:20px;">' +
+      'The generated code contains syntax that the browser preview cannot process. You can still copy and use the code in your project.' +
+      '</div>' +
+      '<button id="retry-btn" style="padding:8px 16px;background:#1c1917;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Try Again</button>' +
+      '<div style="margin-top:16px;color:#a8a29e;font-size:11px;font-family:monospace;max-width:100%;overflow-wrap:break-word;">' +
       String(msg).replace(/</g, "&lt;").replace(/>/g, "&gt;") +
+      '</div>' +
       '</div>';
+
+    var btn = document.getElementById("retry-btn");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        window.parent.postMessage({ type: "preview-retry" }, "*");
+      });
+    }
   }
 
   function normalizeJsx(s) {
@@ -127,20 +140,35 @@ ${JSON.stringify(cleanedCode)}
   return URL.createObjectURL(blob);
 }
 
-export function PreviewFrame({ code }: { code: string }) {
-  const [url, setUrl] = useState<string>("");
+interface PreviewFrameProps {
+  code: string;
+  onRetry?: () => void;
+}
 
-  console.log("Sanitized code for preview:", sanitizeCode(code));
+export function PreviewFrame({ code, onRetry }: PreviewFrameProps) {
+  const [url, setUrl] = useState<string>("");
 
   useEffect(() => {
     const newUrl = makeBlobUrl(code);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUrl(newUrl);
     return () => URL.revokeObjectURL(newUrl);
   }, [code]);
 
+  useEffect(() => {
+    function handler(event: MessageEvent) {
+      if (event.data?.type === "preview-retry" && onRetry) {
+        onRetry();
+      }
+    }
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [onRetry]);
+
   if (!url) {
     return (
-      <div className="w-full min-h-[320px] rounded-md bg-white dark:bg-[#0c0a09] flex items-center justify-center">
+      <div className="w-full h-96 rounded-md bg-white dark:bg-[#0c0a09] flex items-center justify-center">
         <span className="text-muted-foreground text-sm">
           Preparing preview...
         </span>
@@ -151,7 +179,7 @@ export function PreviewFrame({ code }: { code: string }) {
   return (
     <iframe
       src={url}
-      className="w-full min-h-[320px] border-0 rounded-md bg-white dark:bg-[#0c0a09]"
+      className="w-full h-96 border-0 rounded-md bg-white dark:bg-[#0c0a09]"
       sandbox="allow-scripts"
       title="Component preview"
     />
