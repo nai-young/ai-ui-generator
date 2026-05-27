@@ -2,102 +2,121 @@
 
 import { useEffect, useState } from "react";
 
+function sanitizeCode(code: string): string {
+  let s = code.trim();
+
+  s = s.replace(/^["']use client["'];?\s*/gm, "");
+  s = s
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("import "))
+    .join("\n");
+  s = s.replace(/\bexport\s+default\s+/g, "");
+  s = s.replace(/\bexport\s+/g, "");
+  s = s.replace(/stroke-linecap=/g, "strokeLinecap=");
+  s = s.replace(/stroke-linejoin=/g, "strokeLinejoin=");
+  s = s.replace(/stroke-width=/g, "strokeWidth=");
+  s = s.replace(/fill-rule=/g, "fillRule=");
+  s = s.replace(/clip-rule=/g, "clipRule=");
+  s = s.replace(/class=/g, "className=");
+
+  return s;
+}
+
 function makeBlobUrl(code: string): string {
+  const cleanedCode = sanitizeCode(code);
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-  body { margin: 0; padding: 24px; min-height: 100vh; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  body {
+    margin: 0;
+    padding: 24px;
+    min-height: 100vh;
+    width: 100vw;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    background: white;
+  }
   * { box-sizing: border-box; }
 </style>
 </head>
 <body>
-<div id="root"><div style="padding:16px;color:#78716c;font-size:13px;">Loading preview...</div></div>
+<div id="root">
+  <div style="padding:16px;color:#78716c;font-size:13px;">Loading preview...</div>
+</div>
+
+<script type="application/json" id="component-code">
+${JSON.stringify(cleanedCode)}
+</script>
+
 <script>
-(function() {
+(function () {
   function showError(msg) {
-    document.getElementById('root').innerHTML =
-      '<div style="color:#dc2626;padding:16px;font-family:monospace;font-size:13px;line-height:1.5;">' +
-      '<strong style="font-size:14px;">Preview Error</strong><br><br>' +
-      msg.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+    var root = document.getElementById("root");
+    root.innerHTML =
+      '<div style="color:#dc2626;padding:16px;font-family:monospace;font-size:13px;white-space:pre-wrap;">' +
+      '<strong>Preview Error</strong><br><br>' +
+      String(msg).replace(/</g, "&lt;").replace(/>/g, "&gt;") +
       '</div>';
+  }
+
+  function normalizeJsx(s) {
+    return s
+      .replace(/stroke-linecap=/g, "strokeLinecap=")
+      .replace(/stroke-linejoin=/g, "strokeLinejoin=")
+      .replace(/stroke-width=/g, "strokeWidth=")
+      .replace(/fill-rule=/g, "fillRule=")
+      .replace(/clip-rule=/g, "clipRule=")
+      .replace(/class=/g, "className=");
   }
 
   function run() {
     try {
-      var raw = ${JSON.stringify(code)};
+      var raw = JSON.parse(document.getElementById("component-code").textContent || '""');
+      raw = normalizeJsx(raw);
 
-      // --- Strip imports (very aggressive) ---
-      // Remove any line that starts with import
-      raw = raw.split('\\n').map(function(line) {
-        var trimmed = line.trim();
-        if (trimmed.indexOf('import ') === 0 || trimmed.indexOf('import{') === 0) return '';
-        return line;
-      }).join('\\n');
+      var wrapped =
+        "(function(React){\\n" +
+        "return function PreviewComponent(){\\n" +
+        "return (\\n" +
+        raw +
+        "\\n);\\n" +
+        "}\\n" +
+        "})(window.React)";
 
-      // --- Strip exports (very aggressive) ---
-      raw = raw.split('export default').join('');
-      raw = raw.split('export ').join('');
-      raw = raw.split('export').join('');
-
-      // --- Strip TypeScript ---
-      raw = raw.split(': React.FC').join('');
-      raw = raw.split(': JSX.Element').join('');
-      raw = raw.replace(/:\s*string\b/g, '');
-      raw = raw.replace(/:\s*number\b/g, '');
-      raw = raw.replace(/:\s*boolean\b/g, '');
-      raw = raw.replace(/interface\s+\w+\s*\{[^}]*\}/g, '');
-
-      // Clean up double newlines
-      raw = raw.replace(/\\n\\n\\n+/g, '\\n\\n');
-
-      // Extract component name
-      var nameMatch = raw.match(/(?:function|const|let|var)\\s+(\\w+)/);
-      var componentName = nameMatch ? nameMatch[1] : 'Component';
-
-      // Wrap for Babel
-      var wrapped = '(function(React){\\n' + raw + '\\n;return ' + componentName + ';\\n})(window.React)';
-
-      var result = Babel.transform(wrapped, {
-        presets: ['react'],
-        filename: 'component.tsx',
+      var transformed = Babel.transform(wrapped, {
+        presets: [["react", { runtime: "classic" }]],
+        filename: "component.jsx"
       });
 
-      var Component = eval(result.code);
+      var Component = eval(transformed.code);
 
-      if (typeof Component !== 'function') {
-        showError('Could not find a valid React component in the code.');
-        return;
-      }
+      var rootEl = document.getElementById("root");
+      rootEl.innerHTML = "";
 
-      var rootEl = document.getElementById('root');
-      rootEl.innerHTML = '';
-      var root = ReactDOM.createRoot(rootEl);
-      root.render(React.createElement(Component));
+      ReactDOM.createRoot(rootEl).render(
+        React.createElement(Component)
+      );
     } catch (err) {
-      showError((err.message || String(err)));
+      showError(err.stack || err.message || String(err));
       console.error(err);
     }
   }
 
-  var attempts = 0;
-  var maxAttempts = 200;
   function wait() {
-    attempts++;
-    if (window.Babel && window.React && window.ReactDOM) {
+    if (window.React && window.ReactDOM && window.Babel) {
       run();
-    } else if (attempts < maxAttempts) {
-      setTimeout(wait, 50);
     } else {
-      showError('Preview dependencies (React, Babel) failed to load. Check your internet connection.');
+      setTimeout(wait, 50);
     }
   }
+
   wait();
 })();
 </script>
@@ -111,6 +130,8 @@ function makeBlobUrl(code: string): string {
 export function PreviewFrame({ code }: { code: string }) {
   const [url, setUrl] = useState<string>("");
 
+  console.log("Sanitized code for preview:", sanitizeCode(code));
+
   useEffect(() => {
     const newUrl = makeBlobUrl(code);
     setUrl(newUrl);
@@ -120,7 +141,9 @@ export function PreviewFrame({ code }: { code: string }) {
   if (!url) {
     return (
       <div className="w-full min-h-[320px] rounded-md bg-white dark:bg-[#0c0a09] flex items-center justify-center">
-        <span className="text-muted-foreground text-sm">Preparing preview...</span>
+        <span className="text-muted-foreground text-sm">
+          Preparing preview...
+        </span>
       </div>
     );
   }

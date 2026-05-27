@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -99,6 +99,7 @@ export default function Home() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [checkingProviders, setCheckingProviders] = useState(true);
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
+  const codeContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     try {
@@ -109,6 +110,15 @@ export default function Home() {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "code") return;
+
+    const el = codeContainerRef.current;
+    if (!el) return;
+
+    el.scrollTop = el.scrollHeight;
+  }, [result?.code, activeTab]);
 
   useEffect(() => {
     fetch("/api/health")
@@ -153,7 +163,7 @@ export default function Home() {
     setLoading(true);
     setResult(null);
     setGeneratingFormat(format);
-    setActiveTab("preview");
+    setActiveTab("code");
 
     try {
       const res = await fetch("/api/generate", {
@@ -204,6 +214,9 @@ export default function Home() {
           ? err.message
           : "Something went wrong generating the component.",
       );
+    } finally {
+      fetchRateLimit();
+      console.log("Generation complete");
     }
   };
 
@@ -412,265 +425,291 @@ export default function Home() {
           {/* MAIN */}
           <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <ScrollArea className="flex-1">
-              <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-8">
-                {/* PROMPT AREA */}
-                <section className="space-y-4">
-                  <div className="space-y-1">
-                    <h2 className="text-lg font-medium">
-                      What do you want to build?
-                    </h2>
-                    <p className="text-base text-muted-foreground">
-                      Describe a UI component in plain english. Be specific
-                      about layout, colors, and interactions.
-                    </p>
+              <div className="p-4 sm:p-6">
+                {/* WORKSPACE — side by side on desktop */}
+                <div className="w-full flex flex-col justify-between md:flex-row gap-6 overflow-hidden">
+                  {/* LEFT — Prompt */}
+                  <div className="flex-1 shrink-0 space-y-4">
+                    <div className="space-y-1">
+                      <h2 className="text-lg font-medium">
+                        What do you want to build?
+                      </h2>
+                      <p className="text-base text-muted-foreground">
+                        Describe a UI component. Be specific about layout,
+                        colors, and interactions.
+                      </p>
+                    </div>
+
+                    <Card className="p-0 overflow-hidden border border-border shadow-sm">
+                      <Textarea
+                        className="min-h-[200px] border-0 rounded-none resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base px-4 py-4 bg-transparent"
+                        placeholder="e.g. a settings panel with a sidebar, toggle switches for notifications, and a danger zone at the bottom..."
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                            generate("react");
+                          }
+                        }}
+                      />
+                      <div className="px-3 sm:px-4 py-3 border-t border-border bg-muted/30 flex flex-col gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {EXAMPLES.map((ex) => (
+                            <button
+                              key={ex.title}
+                              onClick={() => setPrompt(ex.prompt)}
+                              className="text-sm px-3 py-1.5 rounded-md bg-background border border-border hover:border-primary/40 hover:text-primary transition-colors"
+                            >
+                              {ex.title}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-9 text-base gap-2 w-full"
+                                disabled={
+                                  loading || !prompt.trim() || isRateLimited
+                                }
+                              >
+                                {loading ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Wand2 className="w-4 h-4" />
+                                )}
+                                {loading
+                                  ? generatingFormat === "html"
+                                    ? "Building HTML..."
+                                    : "Building React..."
+                                  : isRateLimited
+                                    ? "Limit reached"
+                                    : "Generate"}
+                                <ChevronRight className="w-4 h-4 opacity-50" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => generate("react")}
+                                disabled={
+                                  loading || !prompt.trim() || isRateLimited
+                                }
+                                className="text-base gap-2"
+                              >
+                                <FileCode2 className="w-4 h-4" />
+                                As React + Tailwind
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => generate("html")}
+                                disabled={
+                                  loading || !prompt.trim() || isRateLimited
+                                }
+                                className="text-base gap-2"
+                              >
+                                <FileType2 className="w-4 h-4" />
+                                As plain HTML
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </Card>
                   </div>
 
-                  <Card className="p-0 overflow-hidden border border-border shadow-sm">
-                    <Textarea
-                      className="min-h-[160px] border-0 rounded-none resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base px-4 py-4 bg-transparent"
-                      placeholder="e.g. a settings panel with a sidebar, toggle switches for notifications, and a danger zone at the bottom..."
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      onKeyDown={(e) => {
-                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                          generate("react");
-                        }
-                      }}
-                    />
-                    <div className="px-3 sm:px-4 py-3 border-t border-border bg-muted/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {EXAMPLES.map((ex) => (
-                          <button
-                            key={ex.title}
-                            onClick={() => setPrompt(ex.prompt)}
-                            className="text-sm px-3 py-1.5 rounded-md bg-background border border-border hover:border-primary/40 hover:text-primary transition-colors"
-                          >
-                            {ex.title}
-                          </button>
-                        ))}
+                  {/* RIGHT — Result */}
+                  <div className="w-full md:w-1/2 overflow-hidden">
+                    {loading && !result && (
+                      <div className="h-full flex flex-col items-center justify-center gap-4 min-h-[320px]">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                        <p className="text-base text-muted-foreground">
+                          Generating{" "}
+                          {generatingFormat === "html"
+                            ? "HTML"
+                            : "React component"}
+                          ...
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                    )}
+
+                    {result && (
+                      <section className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-lg font-medium">
+                              {result.title}
+                            </h3>
+                            <Badge
+                              variant="outline"
+                              className="text-sm h-7 border-border/60"
+                            >
+                              {result.format === "html" ? "HTML" : "React"}
+                            </Badge>
+                            {result.provider && (
+                              <span className="text-sm text-muted-foreground capitalize">
+                                {result.provider}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-9 text-base gap-2 w-full sm:w-auto"
-                              disabled={
-                                loading || !prompt.trim() || isRateLimited
-                              }
-                            >
-                              {loading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Wand2 className="w-4 h-4" />
-                              )}
-                              {loading
-                                ? generatingFormat === "html"
-                                  ? "Building HTML..."
-                                  : "Building React..."
-                                : isRateLimited
-                                  ? "Limit reached"
-                                  : "Generate"}
-                              <ChevronRight className="w-4 h-4 opacity-50" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => generate("react")}
-                              disabled={
-                                loading || !prompt.trim() || isRateLimited
-                              }
-                              className="text-base gap-2"
-                            >
-                              <FileCode2 className="w-4 h-4" />
-                              As React + Tailwind
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => generate("html")}
-                              disabled={
-                                loading || !prompt.trim() || isRateLimited
-                              }
-                              className="text-base gap-2"
-                            >
-                              <FileType2 className="w-4 h-4" />
-                              As plain HTML
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </Card>
-                </section>
-
-                {/* RESULT */}
-                {loading && !result && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 text-base text-muted-foreground">
-                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                      <span>
-                        Generating{" "}
-                        {generatingFormat === "html"
-                          ? "HTML"
-                          : "React component"}
-                        ...
-                      </span>
-                    </div>
-                    <Card className="h-72 bg-muted/30 border-dashed border-border" />
-                  </div>
-                )}
-
-                {result && (
-                  <section className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-lg font-medium">{result.title}</h3>
-                        <Badge
-                          variant="outline"
-                          className="text-sm h-7 border-border/60"
-                        >
-                          {result.format === "html" ? "HTML" : "React"}
-                        </Badge>
-                        {result.provider && (
-                          <span className="text-sm text-muted-foreground capitalize">
-                            {result.provider}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-9 text-base gap-2"
-                          onClick={copyCode}
-                        >
-                          <Copy className="w-4 h-4" />
-                          Copy
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="secondary"
                               className="h-9 text-base gap-2"
+                              onClick={copyCode}
                             >
-                              <Download className="w-4 h-4" />
-                              Export
+                              <Copy className="w-4 h-4" />
+                              Copy
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={exportReact}
-                              className="text-base gap-2"
-                            >
-                              <FileCode2 className="w-4 h-4" />
-                              Export as .tsx
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={exportHtml}
-                              className="text-base gap-2"
-                            >
-                              <FileType2 className="w-4 h-4" />
-                              Export as .html
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-
-                    <Tabs
-                      value={activeTab}
-                      onValueChange={(v) =>
-                        setActiveTab(v as "preview" | "code")
-                      }
-                      className="w-full"
-                    >
-                      <TabsList className="grid w-full grid-cols-2 bg-muted/50 !h-full">
-                        <TabsTrigger value="preview" className="text-base">
-                          Preview
-                        </TabsTrigger>
-                        <TabsTrigger value="code" className="text-base h-10">
-                          Code
-                        </TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="preview" className="mt-4">
-                        <Card className="p-1 border border-border bg-card/50">
-                          {result.format === "html" ? (
-                            <div className="rounded-md bg-white dark:bg-[#0c0a09] min-h-[280px] p-6 flex items-center justify-center overflow-auto">
-                              <div
-                                className="w-full"
-                                dangerouslySetInnerHTML={{
-                                  __html: result.code,
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <PreviewFrame code={result.code} />
-                          )}
-                        </Card>
-                        <p className="text-sm text-muted-foreground mt-3 text-center">
-                          Preview rendered in an isolated container. Some
-                          interactions may be limited.
-                        </p>
-                      </TabsContent>
-
-                      <TabsContent value="code" className="mt-4">
-                        <Card className="overflow-hidden border border-border">
-                          <div className="bg-[#1e1e1e] px-4 py-2.5 flex items-center justify-between border-b border-white/5">
-                            <span className="text-sm text-white/40 font-mono">
-                              {result.format === "html"
-                                ? "component.html"
-                                : "Component.tsx"}
-                            </span>
-                            <span className="text-sm text-white/40">
-                              {result.code.length} chars
-                            </span>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-9 text-base gap-2"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Export
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={exportReact}
+                                  className="text-base gap-2"
+                                >
+                                  <FileCode2 className="w-4 h-4" />
+                                  Export as .tsx
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={exportHtml}
+                                  className="text-base gap-2"
+                                >
+                                  <FileType2 className="w-4 h-4" />
+                                  Export as .html
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-                          <SyntaxHighlighter
-                            language={syntaxLang}
-                            style={vscDarkPlus}
-                            customStyle={{
-                              margin: 0,
-                              borderRadius: 0,
-                              fontSize: "14px",
-                              lineHeight: "1.6",
-                              background: "#1e1e1e",
-                              maxHeight: "560px",
-                            }}
-                            showLineNumbers
-                            lineNumberStyle={{
-                              fontSize: "12px",
-                              color: "#4b5563",
-                              minWidth: "2em",
-                              paddingRight: "1em",
-                            }}
-                          >
-                            {result.code}
-                          </SyntaxHighlighter>
-                        </Card>
-                      </TabsContent>
-                    </Tabs>
-                  </section>
-                )}
+                        </div>
 
-                {/* EMPTY STATE */}
-                {!result && !loading && (
-                  <div className="pt-14 pb-24 text-center space-y-5">
-                    <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto">
-                      <Sparkles className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-lg font-medium text-muted-foreground">
-                        Ready when you are
-                      </p>
-                      <p className="text-base text-muted-foreground mt-2 max-w-md mx-auto leading-relaxed">
-                        Pick an example above or describe your own component.
-                        Press Cmd+Enter to generate quickly.
-                      </p>
-                    </div>
+                        <Tabs
+                          value={activeTab}
+                          onValueChange={(v) => {
+                            if (loading && v === "preview") return;
+                            setActiveTab(v as "preview" | "code");
+                          }}
+                          className="w-full md:w-[800px]"
+                        >
+                          <TabsList className="grid w-full grid-cols-2 bg-muted/50 !h-full">
+                            <TabsTrigger
+                              value="preview"
+                              className="text-base cursor-pointer"
+                              disabled={loading}
+                            >
+                              Preview{" "}
+                              {loading ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                              ) : null}
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="code"
+                              className="text-base cursor-pointer"
+                            >
+                              Code
+                            </TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="preview" className="mt-4">
+                            <Card className="p-1 border border-border bg-card/50">
+                              {loading ? (
+                                <div className="min-h-[320px] flex items-center justify-center text-sm text-muted-foreground">
+                                  Generating preview...
+                                </div>
+                              ) : result.format === "html" ? (
+                                <div className="rounded-md bg-white dark:bg-[#0c0a09] min-h-[280px] p-6 flex items-center justify-center overflow-auto">
+                                  <div
+                                    dangerouslySetInnerHTML={{
+                                      __html: result.code,
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <PreviewFrame code={result.code} />
+                              )}
+                            </Card>
+                            <p className="text-sm text-muted-foreground mt-3 text-center">
+                              Preview rendered in an isolated container. Some
+                              interactions may be limited.
+                            </p>
+                          </TabsContent>
+
+                          <TabsContent value="code" className="mt-4">
+                            <Card className="overflow-hidden border border-border">
+                              <div className="bg-[#1e1e1e] px-4 py-2.5 flex items-center justify-between border-b border-white/5">
+                                <span className="text-sm text-white/40 font-mono">
+                                  {result.format === "html"
+                                    ? "component.html"
+                                    : "Component.tsx"}
+                                </span>
+                                <span className="text-sm text-white/40">
+                                  {result.code.length} chars
+                                </span>
+                              </div>
+                              <div>
+                                <SyntaxHighlighter
+                                  ref={codeContainerRef}
+                                  language={syntaxLang}
+                                  style={vscDarkPlus}
+                                  wrapLines={true}
+                                  wrapLongLines={true}
+                                  customStyle={{
+                                    margin: 0,
+                                    borderRadius: 0,
+                                    fontSize: "14px",
+                                    lineHeight: "1.6",
+                                    background: "#1e1e1e",
+                                    maxWidth: "800px",
+                                    maxHeight: "500px",
+                                    overflow: "auto",
+                                  }}
+                                  showLineNumbers
+                                  lineNumberStyle={{
+                                    fontSize: "12px",
+                                    color: "#4b5563",
+                                    minWidth: "2em",
+                                    paddingRight: "1em",
+                                    userSelect: "none",
+                                  }}
+                                >
+                                  {result.code}
+                                </SyntaxHighlighter>
+                              </div>
+                            </Card>
+                          </TabsContent>
+                        </Tabs>
+                      </section>
+                    )}
+
+                    {/* EMPTY STATE */}
+                    {!result && !loading && (
+                      <div className="h-full flex flex-col items-center justify-center gap-5 min-h-[320px]">
+                        <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+                          <Sparkles className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-lg font-medium text-muted-foreground">
+                            Ready when you are
+                          </p>
+                          <p className="text-base text-muted-foreground mt-2 max-w-md mx-auto leading-relaxed">
+                            Pick an example or describe your own component.
+                            Press Cmd+Enter to generate quickly.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </ScrollArea>
           </main>

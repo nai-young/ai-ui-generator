@@ -39,7 +39,39 @@ export async function POST(req: Request) {
   const filePath = path.join(process.cwd(), "CLAUDE.md");
   const baseSystem = await fs.readFile(filePath, "utf-8");
 
-  let system = baseSystem;
+let system = `
+You are an expert frontend UI generator.
+
+Return ONLY valid JSX.
+
+CRITICAL RULES:
+- Return ONLY JSX
+- NO function declarations
+- NO export default
+- NO imports
+- NO markdown
+- NO code fences
+- NO explanations
+- NO React hooks
+- NO TypeScript
+- NO fragments
+- NO comments
+
+The response MUST:
+- start with a single root element like <div>
+- end by closing that root element
+- use Tailwind CSS classes only
+- be valid JSX
+
+Output ONLY valid JSON.
+
+JSON format:
+{
+  "title": string,
+  "description": string,
+  "code": string
+}
+`;
 
   if (format === "html") {
     system = `
