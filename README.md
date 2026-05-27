@@ -5,6 +5,9 @@ An AI-powered tool that generates modern UI components from natural language pro
 
 Built with **Next.js**, **Tailwind CSS**, and **shadcn/ui**, focused on a clean SaaS-style experience similar to tools like v0 or Linear.
 
+<img width="1919" height="849" alt="Screenshot_2026-05-27_23-16-59" src="https://github.com/user-attachments/assets/a30cac2a-8ec7-4330-9040-a7d61433e08a" />
+
+
 ---
 
 ## ✨ Features
