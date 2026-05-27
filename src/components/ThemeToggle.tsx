@@ -8,23 +8,16 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="cursor-pointer"
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      >
-        {theme === "dark" ? (
-          <Sun className="w-4 h-4" />
-        ) : (
-          <Moon className="w-4 h-4" />
-        )}
-      </Button>
-
-      <div className="text-[10px] text-muted-foreground">
-        {theme === "dark" ? "Dark" : "Light"}
-      </div>
-    </div>
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+    >
+      <Sun className="h-3.5 w-3.5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-3.5 w-3.5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <span className="sr-only">Toggle theme</span>
+    </Button>
   );
 }
