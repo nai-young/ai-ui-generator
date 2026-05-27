@@ -31,6 +31,7 @@ import {
   WifiOff,
   Timer,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -102,6 +103,7 @@ export default function Home() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ui-history");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved) setHistory(JSON.parse(saved));
     } catch {
       // ignore
@@ -133,6 +135,13 @@ export default function Home() {
 
   const activeProvider = providers.find((p) => p.available);
   const isRateLimited = rateLimit ? !rateLimit.allowed : false;
+
+  const startNew = () => {
+    setPrompt("");
+    setResult(null);
+    setLoading(false);
+    setActiveTab("preview");
+  };
 
   const persistHistory = useCallback((items: HistoryItem[]) => {
     setHistory(items);
@@ -188,10 +197,12 @@ export default function Home() {
           persistHistory(updated);
         }
       }, 2);
-    } catch (err: any) {
+    } catch (err: Error | unknown) {
       setLoading(false);
       toast.error(
-        err.message || "Something went wrong generating the component.",
+        err instanceof Error
+          ? err.message
+          : "Something went wrong generating the component.",
       );
     }
   };
@@ -286,6 +297,15 @@ export default function Home() {
                   )}
                 </div>
               )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 text-sm gap-1.5"
+                onClick={startNew}
+              >
+                <Plus className="w-4 h-4" />
+                New
+              </Button>
               <ThemeToggle />
             </div>
           </div>
@@ -305,7 +325,7 @@ export default function Home() {
                   className="text-sm text-muted-foreground hover:text-destructive transition-colors shrink-0"
                   title="Clear history"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="cursor-pointer w-4 h-4" />
                 </button>
               )}
             </div>
@@ -565,11 +585,11 @@ export default function Home() {
                       }
                       className="w-full"
                     >
-                      <TabsList className="grid w-full grid-cols-2 h-10 bg-muted/50">
-                        <TabsTrigger value="preview" className="text-base h-9">
+                      <TabsList className="grid w-full grid-cols-2 bg-muted/50 !h-full">
+                        <TabsTrigger value="preview" className="text-base">
                           Preview
                         </TabsTrigger>
-                        <TabsTrigger value="code" className="text-base h-9">
+                        <TabsTrigger value="code" className="text-base h-10">
                           Code
                         </TabsTrigger>
                       </TabsList>

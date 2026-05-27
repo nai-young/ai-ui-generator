@@ -15,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="h-screen">
+      <body className="h-screen" suppressHydrationWarning>
         <Providers>
           <TooltipProvider delayDuration={200}>
             {children}
