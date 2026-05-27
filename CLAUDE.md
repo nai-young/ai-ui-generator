@@ -6,7 +6,7 @@ You are working inside a Next.js + Tailwind + shadcn/ui project. Your job is to 
 
 
 ## Goal
-Build a UI generator that turns user prompts into React + Tailwind components using Claude API.
+Build a UI generator that turns user prompts into React + Tailwind components using LLM APIs.
 
 ## Rules
 - Always return valid React + Tailwind code
@@ -29,6 +29,17 @@ JSON format:
 }
 ```
 
+## IMPORTANT: Component naming
+For React components, the code MUST define a default-exported function named `Component`.
+Example:
+```tsx
+export default function Component() {
+  return (
+    <div className="...">...</div>
+  );
+}
+```
+
 ## UI REQUIREMENTS:
 - Modern design
 - Responsive by default
@@ -47,5 +58,3 @@ JSON format:
 - Fast feedback
 - Minimal UI
 - Product-like design (Vercel / Linear style)
-
-

@@ -1,9 +1,40 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { generateWithLLM } from "@/lib/llm";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { safeJsonParse } from "@/lib/parse-json";
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp;
+  return "unknown";
+}
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  const rateLimit = checkRateLimit(ip);
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: "Rate limit exceeded. Try again in a few minutes.",
+        rateLimit,
+      },
+      { status: 429 }
+    );
+  }
+
   const { prompt, format = "react" } = await req.json();
+
+  if (!prompt || typeof prompt !== "string") {
+    return NextResponse.json(
+      { error: "Prompt is required" },
+      { status: 400 }
+    );
+  }
 
   const filePath = path.join(process.cwd(), "CLAUDE.md");
   const baseSystem = await fs.readFile(filePath, "utf-8");
@@ -49,30 +80,28 @@ JSON format:
 `;
   }
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": process.env.ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 1500,
-      messages: [
-        {
-          role: "user",
-          content: `${system}
+  try {
+    const result = await generateWithLLM({
+      system,
+      prompt,
+      maxTokens: 4000,
+    });
 
-USER REQUEST:
-${prompt}`,
-        },
-      ],
-    }),
-  });
+    const parsed = safeJsonParse(result.text);
 
-  const data = await response.json();
-  const text = data.content[0].text;
-
-  return NextResponse.json(JSON.parse(text));
+    return NextResponse.json({
+      ...parsed,
+      _meta: {
+        provider: result.provider,
+        model: result.model,
+      },
+      rateLimit,
+    });
+  } catch (err: any) {
+    console.error("Generation error:", err);
+    return NextResponse.json(
+      { error: err.message || "Failed to generate component", rateLimit },
+      { status: 500 }
+    );
+  }
 }
